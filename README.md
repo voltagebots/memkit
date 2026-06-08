@@ -59,7 +59,7 @@ Set `"resolve_conflicts": false` to store verbatim without conflict-lens.
 
 ## conflict-lens
 
-The conflict engine lives in [`internal/conflict`](internal/conflict) and is dependency-free by design — it will be extracted into a standalone importable module. It applies a token-overlap heuristic (add / update / duplicate) with an optional `Resolver` hook for LLM-grade semantic resolution of ambiguous cases. See [docs/DESIGN.md](docs/DESIGN.md).
+The conflict engine is its own dependency-free module — [`github.com/voltagebots/conflict-lens`](https://github.com/voltagebots/conflict-lens) — so it's reusable outside memkit. It applies a token-overlap heuristic (add / update / duplicate) with an optional `Resolver` hook for LLM-grade semantic resolution of ambiguous cases. See [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Docs
 

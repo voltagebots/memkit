@@ -25,7 +25,7 @@ type Memory struct {
 	AccessCount  int               `json:"access_count"`
 	// SupersededBy is the ID of the memory that replaced this one, or "" if
 	// this fact is still active. Conflict resolution archives rather than
-	// deletes, preserving lineage. See internal/conflict.
+	// deletes, preserving lineage. See github.com/voltagebots/conflict-lens.
 	SupersededBy string `json:"superseded_by,omitempty"`
 }
 
