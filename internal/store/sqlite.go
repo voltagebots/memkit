@@ -237,6 +237,30 @@ func (s *SQLite) PurgeUser(ctx context.Context, tenant, user string) (int, error
 	return int(n), tx.Commit()
 }
 
+func (s *SQLite) PruneSuperseded(ctx context.Context, olderThan time.Time) (int, error) {
+	cutoff := olderThan.UnixMilli()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	// Mirror the delete into the FTS table first (it has no FK cascade).
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM memories_fts WHERE id IN (
+			SELECT id FROM memories WHERE superseded_by IS NOT NULL AND last_accessed < ?
+		)`, cutoff); err != nil {
+		return 0, err
+	}
+	res, err := tx.ExecContext(ctx,
+		`DELETE FROM memories WHERE superseded_by IS NOT NULL AND last_accessed < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), tx.Commit()
+}
+
 func (s *SQLite) Categories(ctx context.Context, tenant, user string) ([]Category, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT category, COUNT(*), MAX(last_accessed)

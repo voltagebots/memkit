@@ -56,6 +56,21 @@ Set `"resolve_conflicts": false` to store verbatim without conflict-lens.
 | `MEMKIT_ADDR` | `:8080` | Listen address |
 | `MEMKIT_DB` | `memkit.db` | SQLite path (`:memory:` for ephemeral) |
 | `MEMKIT_API_KEYS` | `dev-key:default` | `key1:tenant1,key2:tenant2` |
+| `MEMKIT_CONSOLIDATE_INTERVAL` | `1h` | How often the maintenance loop runs |
+| `MEMKIT_SUPERSEDED_RETENTION` | `720h` | Archived (superseded) facts older than this are pruned |
+
+## Docker
+
+```bash
+docker build -t memkit .
+docker run -p 8080:8080 -v memkit-data:/data -e MEMKIT_API_KEYS="prod-key:acme" memkit
+```
+
+Static binary on `distroless/static` as non-root (uid 65532). The DB lives at `/data/memkit.db` — mount a volume to persist it.
+
+## Maintenance
+
+A background loop prunes superseded facts older than `MEMKIT_SUPERSEDED_RETENTION`, keeping the store lean while recent history stays queryable. Read-time recency *decay* is separate (in search scoring). Tune cadence with `MEMKIT_CONSOLIDATE_INTERVAL`.
 
 ## conflict-lens
 

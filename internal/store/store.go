@@ -78,6 +78,12 @@ type Store interface {
 	// Returns the number of rows removed.
 	PurgeUser(ctx context.Context, tenant, user string) (int, error)
 
+	// PruneSuperseded hard-deletes superseded (archived) memories last touched
+	// before olderThan, across all tenants. Active facts are never removed.
+	// Used by the maintenance loop to keep the store lean while retaining
+	// recent history. Returns the number of rows removed.
+	PruneSuperseded(ctx context.Context, olderThan time.Time) (int, error)
+
 	// Categories lists active-memory categories for a user.
 	Categories(ctx context.Context, tenant, user string) ([]Category, error)
 
