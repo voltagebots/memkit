@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	conflict "github.com/voltagebots/conflict-lens"
 	"github.com/voltagebots/memkit/internal/api"
-	"github.com/voltagebots/memkit/internal/conflict"
 	"github.com/voltagebots/memkit/internal/store"
 )
 

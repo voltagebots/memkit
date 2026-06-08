@@ -2,7 +2,10 @@ module github.com/voltagebots/memkit
 
 go 1.26.4
 
-require modernc.org/sqlite v1.52.0
+require (
+	github.com/voltagebots/conflict-lens v0.1.0
+	modernc.org/sqlite v1.52.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect

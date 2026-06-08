@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/voltagebots/memkit/internal/conflict"
+	conflict "github.com/voltagebots/conflict-lens"
 	"github.com/voltagebots/memkit/internal/store"
 )
 
