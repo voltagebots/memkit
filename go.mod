@@ -1,6 +1,6 @@
 module github.com/voltagebots/memkit
 
-go 1.26.3
+go 1.26.4
 
 require modernc.org/sqlite v1.52.0
 
