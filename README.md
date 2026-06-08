@@ -82,6 +82,23 @@ The conflict engine is its own dependency-free module — [`github.com/voltagebo
 
 Set an Anthropic API key and memkit attaches a Claude-backed resolver and widens the conflict band so short/ambiguous facts are sent for semantic judgment — closing the lexical blind spot ("I love my job" → "I hate my job"). The resolver is consulted **only** for borderline cases (clear adds/duplicates/conflicts stay on the free heuristic), the system prompt is prompt-cached, and it uses a small fast model. On any API error the engine falls back to the heuristic. Implementation: [`internal/resolver`](internal/resolver).
 
+## Use from Claude Code / any MCP client
+
+`cmd/memkit-mcp` is a dependency-free stdio **MCP bridge** so an MCP client can use memkit as its long-term memory (tools: `remember`, `recall`, `update_memory`, `forget`, `list_categories`).
+
+```bash
+go build -o memkit-mcp ./cmd/memkit-mcp
+
+# point an MCP client at it (Claude Code shown):
+claude mcp add memkit --scope user \
+  -e MEMKIT_URL=http://localhost:8420 \
+  -e MEMKIT_API_KEY=your-key \
+  -e MEMKIT_USER=you \
+  -- /path/to/memkit-mcp
+```
+
+The bridge talks to a running memkit server over REST; run one (see Docker above or `go run ./cmd/memkit`). On macOS, a launchd agent keeps memkit always-on — see [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
+
 ## Docs
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, data model, request flows
