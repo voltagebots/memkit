@@ -1,0 +1,9 @@
+.git
+.github
+*.db
+*.db-wal
+*.db-shm
+/memkit
+/dist
+docs
+README.md

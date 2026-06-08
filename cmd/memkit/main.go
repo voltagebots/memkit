@@ -16,6 +16,7 @@ import (
 
 	conflict "github.com/voltagebots/conflict-lens"
 	"github.com/voltagebots/memkit/internal/api"
+	"github.com/voltagebots/memkit/internal/maintenance"
 	"github.com/voltagebots/memkit/internal/store"
 )
 
@@ -32,6 +33,13 @@ func main() {
 
 	auth := parseAPIKeys(os.Getenv("MEMKIT_API_KEYS"))
 	srv := api.New(st, conflict.NewEngine(), auth)
+
+	// Background consolidation: prune archived facts past retention.
+	rootCtx, cancelRoot := context.WithCancel(context.Background())
+	defer cancelRoot()
+	interval := parseDuration(os.Getenv("MEMKIT_CONSOLIDATE_INTERVAL"), time.Hour)
+	retention := parseDuration(os.Getenv("MEMKIT_SUPERSEDED_RETENTION"), 30*24*time.Hour)
+	go maintenance.New(st, interval, retention).Run(rootCtx)
 
 	httpSrv := &http.Server{
 		Addr:              *addr,
@@ -83,4 +91,18 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// parseDuration parses a Go duration string (e.g. "1h", "720h"), falling back
+// to def on empty or invalid input.
+func parseDuration(raw string, def time.Duration) time.Duration {
+	if raw == "" {
+		return def
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		log.Printf("WARNING: invalid duration %q — using %s", raw, def)
+		return def
+	}
+	return d
 }
