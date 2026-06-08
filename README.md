@@ -58,6 +58,8 @@ Set `"resolve_conflicts": false` to store verbatim without conflict-lens.
 | `MEMKIT_API_KEYS` | `dev-key:default` | `key1:tenant1,key2:tenant2` |
 | `MEMKIT_CONSOLIDATE_INTERVAL` | `1h` | How often the maintenance loop runs |
 | `MEMKIT_SUPERSEDED_RETENTION` | `720h` | Archived (superseded) facts older than this are pruned |
+| `MEMKIT_ANTHROPIC_API_KEY` / `ANTHROPIC_API_KEY` | _(unset)_ | Enables the Claude conflict resolver |
+| `MEMKIT_RESOLVER_MODEL` | `claude-haiku-4-5-20251001` | Model for the resolver |
 
 ## Docker
 
@@ -75,6 +77,10 @@ A background loop prunes superseded facts older than `MEMKIT_SUPERSEDED_RETENTIO
 ## conflict-lens
 
 The conflict engine is its own dependency-free module — [`github.com/voltagebots/conflict-lens`](https://github.com/voltagebots/conflict-lens) — so it's reusable outside memkit. It applies a token-overlap heuristic (add / update / duplicate) with an optional `Resolver` hook for LLM-grade semantic resolution of ambiguous cases. See [docs/DESIGN.md](docs/DESIGN.md).
+
+### Claude resolver (optional)
+
+Set an Anthropic API key and memkit attaches a Claude-backed resolver and widens the conflict band so short/ambiguous facts are sent for semantic judgment — closing the lexical blind spot ("I love my job" → "I hate my job"). The resolver is consulted **only** for borderline cases (clear adds/duplicates/conflicts stay on the free heuristic), the system prompt is prompt-cached, and it uses a small fast model. On any API error the engine falls back to the heuristic. Implementation: [`internal/resolver`](internal/resolver).
 
 ## Docs
 
