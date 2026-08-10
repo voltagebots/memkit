@@ -76,7 +76,7 @@ A background loop prunes superseded facts older than `MEMKIT_SUPERSEDED_RETENTIO
 
 ## conflict-lens
 
-The conflict engine is its own dependency-free module — [`github.com/voltagebots/conflict-lens`](https://github.com/voltagebots/conflict-lens) — so it's reusable outside memkit. It applies a token-overlap heuristic (add / update / duplicate) with an optional `Resolver` hook for LLM-grade semantic resolution of ambiguous cases. See [docs/DESIGN.md](docs/DESIGN.md).
+The conflict engine is its own dependency-free module — [`github.com/agent-rails/conflict-lens`](https://github.com/agent-rails/conflict-lens) — so it's reusable outside memkit. It applies a token-overlap heuristic (add / update / duplicate) with an optional `Resolver` hook for LLM-grade semantic resolution of ambiguous cases. See [docs/DESIGN.md](docs/DESIGN.md).
 
 ### Claude resolver (optional)
 
@@ -106,7 +106,7 @@ The bridge talks to a running memkit server over REST; run one (see Docker above
 
 ## Status
 
-v0.1 — REST + SQLite + conflict-lens (heuristic). Roadmap: Postgres backend, gRPC, consolidation/decay cron, embedding-backed recall, LLM Resolver, extract conflict-lens module.
+v0.1 — REST + SQLite + conflict-lens (heuristic + optional LLM resolver), consolidation/decay cron, conflict-lens extracted as its own module. Roadmap: Postgres backend, gRPC, embedding-backed recall.
 
 Built on the model proven in [memory-mcp](https://github.com/voltagebots/memory-mcp) (the TypeScript MCP prototype).
 

@@ -35,7 +35,7 @@ HTTP surface. Bearer-token auth maps an API key to a tenant; every handler is te
 Persistence contract (`Store` interface) plus the SQLite backend. The interface is small and backend-agnostic so a Postgres implementation drops in without touching the API layer. All methods take `tenant` and scope every query by it — there is no cross-tenant read path.
 
 ### `conflict-lens` (external module)
-Decides what a new fact *means* relative to existing ones: `add`, `update` (supersede), or `duplicate`. Lives in its own dependency-free module, [`github.com/voltagebots/conflict-lens`](https://github.com/voltagebots/conflict-lens), so it's reusable beyond memkit. Token-overlap heuristic with an optional `Resolver` interface for LLM-backed judgment in the ambiguous band.
+Decides what a new fact *means* relative to existing ones: `add`, `update` (supersede), or `duplicate`. Lives in its own dependency-free module, [`github.com/agent-rails/conflict-lens`](https://github.com/agent-rails/conflict-lens), so it's reusable beyond memkit. Token-overlap heuristic with an optional `Resolver` interface for LLM-backed judgment in the ambiguous band.
 
 ## Data model
 
