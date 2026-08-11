@@ -1,0 +1,14 @@
+# One pattern per line, case-insensitive substring match against the
+# rendered RESULTS_PUBLIC.md. Fails closed if this file is missing or
+# empty -- do not delete all entries to "pass" a scrub.
+#
+# Seeded with known identifiers only. REQUIRED before running against
+# real voltage/sentinel data: add every real colleague name, org name,
+# and PR/repo identifier that appears anywhere in the real workload --
+# this file is the last line of defense if the numbers-only pipeline
+# upstream ever has a bug, not the primary control.
+Franklin Okpako
+franklin.okpako075
+okpakofr
+voltagebots
+agent-rails
