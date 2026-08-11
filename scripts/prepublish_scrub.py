@@ -60,14 +60,29 @@ def scrub_bytes(content: str, denylist: list[str]) -> ScrubResult:
     # checking every row (including synthetic ones, published at
     # threshold=0 by design) would false-positive on a small synthetic
     # test run and push toward hand-editing this gate to publish.
+    #
+    # CORRECTED (spock MEDIUM x2): (a) this check used to be case-
+    # sensitive while the denylist grep above is case-insensitive -- a
+    # differently-cased label ("POOLED REAL DATA") bypassed this backstop
+    # entirely. (b) the n-column regex only captured \d+; a non-integer n
+    # (e.g. "09.0") failed the match and was silently SKIPPED (fail-open)
+    # instead of treated as a violation -- broadened to capture the whole
+    # cell and fail closed on anything that isn't a clean small integer.
     from harness.constants import MIN_REAL_CELL_N
 
     for line in content.splitlines():
-        if "pooled real data" not in line:
+        if "pooled real data" not in line.lower():
             continue
-        match = re.search(r"\|\s*[^|]+\|\s*[^|]+\|\s*(\d+)\s*\|", line)
-        if match and 0 < int(match.group(1)) < MIN_REAL_CELL_N:
-            reasons.append(f"real-data cell with n={match.group(1)} is below MIN_REAL_CELL_N={MIN_REAL_CELL_N}")
+        cell_match = re.search(r"\|\s*[^|]+\|\s*[^|]+\|\s*([^|]+?)\s*\|", line)
+        if cell_match is None:
+            reasons.append(f"real-data row has no parseable n column: {line!r}")
+            continue
+        raw_n = cell_match.group(1).strip()
+        if not re.fullmatch(r"\d+", raw_n):
+            reasons.append(f"real-data row's n column is not a clean integer: {raw_n!r}")
+            continue
+        if 0 < int(raw_n) < MIN_REAL_CELL_N:
+            reasons.append(f"real-data cell with n={raw_n} is below MIN_REAL_CELL_N={MIN_REAL_CELL_N}")
 
     return ScrubResult(passed=not reasons, reasons=tuple(reasons))
 

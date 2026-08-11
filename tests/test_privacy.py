@@ -46,7 +46,7 @@ def test_no_published_label_ever_contains_a_real_workload_name():
         workload_kind="real",
         state="reported",
         n=8,
-        tokens_used=40,
+        latency_ms_median=40,
     )
     m2 = Metrics(
         backend_name="MemkitBackend",
@@ -54,7 +54,7 @@ def test_no_published_label_ever_contains_a_real_workload_name():
         workload_kind="real",
         state="reported",
         n=8,
-        tokens_used=45,
+        latency_ms_median=45,
     )
     candidate = build_publish_candidate([m1, m2])
     assert len(candidate.cells) > 0
@@ -68,7 +68,7 @@ def test_assert_numbers_only_rejects_bool():
     """bool is an int subclass in Python -- isinstance(True, int) is
     True -- so this must be checked explicitly, not left to isinstance
     against (int, float) alone (code-review MEDIUM)."""
-    bad_cell = PublishCell(label="x", value=0.5, n=100)
+    bad_cell = PublishCell(label="MemkitBackend / contradiction_workload / precision", value=0.5, n=100)
     object.__setattr__(bad_cell, "value", True)
     candidate = PublishCandidate(cells=(bad_cell,), generated_at=time.time())
     with pytest.raises(ValueError, match="bool"):
@@ -135,8 +135,54 @@ def test_real_scrub_gate_passes_on_genuinely_clean_report():
     assert result.passed, result.reasons
 
 
+def test_assert_numbers_only_rejects_arbitrary_label_text():
+    """Direct regression test for spock's HIGH: 'label' was unchecked
+    free text, the structural residual of the original leak BLOCKER. An
+    arbitrary secret string smuggled into a label must be rejected even
+    though value/n/ci are all clean numbers."""
+    smuggled = PublishCell(label="Zylphia Person / Project Nightjar PR-99173 / precision", value=0.8, n=100)
+    candidate = PublishCandidate(cells=(smuggled,), generated_at=time.time())
+    with pytest.raises(ValueError, match="unknown backend"):
+        assert_numbers_only(candidate)
+
+
+def test_assert_numbers_only_accepts_well_formed_labels():
+    synthetic_cell = PublishCell(label="MemkitBackend / contradiction_workload / precision", value=0.8, n=100)
+    real_cell = PublishCell(label="MemkitBackend / pooled real data / storage_bytes", value=1024.0, n=12)
+    candidate = PublishCandidate(cells=(synthetic_cell, real_cell), generated_at=time.time())
+    assert_numbers_only(candidate)  # must not raise
+
+
+def test_scrub_pooled_real_data_check_is_case_insensitive():
+    """Regression for spock's MEDIUM: the min-cell backstop used to be
+    case-sensitive while the denylist grep is case-insensitive, so
+    'POOLED REAL DATA' bypassed the n-floor recheck entirely."""
+    tampered = (
+        "# MemKit vs baselines\n\n"
+        "| Metric | Value | n | 95% CI |\n|---|---|---|---|\n"
+        "| MemkitBackend / POOLED REAL DATA / storage_bytes | 42.0 | 3 | -- |\n"
+    )
+    result = scrub_bytes(tampered, denylist=["PLACEHOLDER_NEVER_MATCHES"])
+    assert not result.passed
+    assert any("below MIN_REAL_CELL_N" in r for r in result.reasons)
+
+
+def test_scrub_rejects_non_integer_n_on_real_row_instead_of_skipping():
+    """Regression for spock's MEDIUM: a non-integer n (e.g. '09.0') used
+    to fail the regex match and be silently skipped (fail-open) instead
+    of treated as a violation."""
+    tampered = (
+        "# MemKit vs baselines\n\n"
+        "| Metric | Value | n | 95% CI |\n|---|---|---|---|\n"
+        "| MemkitBackend / pooled real data / storage_bytes | 42.0 | 09.0 | -- |\n"
+    )
+    result = scrub_bytes(tampered, denylist=["PLACEHOLDER_NEVER_MATCHES"])
+    assert not result.passed
+    assert any("not a clean integer" in r for r in result.reasons)
+
+
 def test_scrub_rejects_non_numeric_field():
-    bad_cell = PublishCell(label="x", value=0.5, n=100)
+    bad_cell = PublishCell(label="MemkitBackend / contradiction_workload / precision", value=0.5, n=100)
     # bypass normal construction to inject a stray string where a number belongs
     bad_cell = dataclasses.replace(bad_cell)
     object.__setattr__(bad_cell, "value", "some real name")
@@ -150,7 +196,7 @@ def test_scrub_scans_rendered_bytes_not_dataclass():
     into the RENDERED report must be caught even though the upstream
     PublishCandidate is entirely clean (numbers only)."""
     clean_candidate = PublishCandidate(
-        cells=(PublishCell(label="MemKit / synthetic / precision", value=0.8, n=100),),
+        cells=(PublishCell(label="MemkitBackend / contradiction_workload / precision", value=0.8, n=100),),
         generated_at=time.time(),
     )
     rendered = render_public_report(clean_candidate)
@@ -191,7 +237,7 @@ def test_min_real_cell_n_enforced():
         workload_kind="real",
         state="reported",
         n=MIN_REAL_CELL_N - 1,
-        tokens_used=100,
+        latency_ms_median=100,
     )
     at_threshold = Metrics(
         backend_name="MemkitBackend",
@@ -199,7 +245,7 @@ def test_min_real_cell_n_enforced():
         workload_kind="real",
         state="reported",
         n=MIN_REAL_CELL_N,
-        tokens_used=100,
+        latency_ms_median=100,
     )
     # below-threshold real data is pooled, not dropped outright -- pooled_n must still clear the bar
     candidate_below_only = build_publish_candidate([below])
@@ -241,7 +287,7 @@ def test_real_measurement_metrics_pooled_before_publish():
         workload_kind="real",
         state="reported",
         n=6,
-        tokens_used=50,
+        latency_ms_median=50,
     )
     m2 = Metrics(
         backend_name="MemkitBackend",
@@ -249,7 +295,7 @@ def test_real_measurement_metrics_pooled_before_publish():
         workload_kind="real",
         state="reported",
         n=6,
-        tokens_used=60,
+        latency_ms_median=60,
     )
     candidate = build_publish_candidate([m1, m2])
     pooled = [c for c in candidate.cells if "pooled real data" in c.label]

@@ -30,9 +30,13 @@ def score_run(run_log: RunLog, workload: Workload) -> Metrics:
     precision, recall = _score_precision_recall(query_entries_with_gold)
     stale_rate, contradiction_rate = _score_stale_and_contradiction(query_entries_with_gold)
 
-    latencies = [e.result.latency_ms for e in write_entries] + [
-        e.latency_ms for _, e in query_entries_with_gold if isinstance(e, QueryLogEntry)
-    ]
+    # CORRECTED (spock LOW): latency_ms previously mixed write and query
+    # latencies into one number, even though update_cost_ms already
+    # exists as a separate write-only metric -- "Retrieval latency" and
+    # "Update cost" are listed as distinct metrics in this project's own
+    # evaluation design; conflating them here was redundant with, and
+    # inconsistent with, that split. latency_ms is now query-only.
+    latencies = [e.latency_ms for _, e in query_entries_with_gold if isinstance(e, QueryLogEntry)]
     update_latencies = [e.result.latency_ms for e in write_entries]
 
     return Metrics(
