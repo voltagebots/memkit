@@ -22,16 +22,27 @@ def build_publish_candidate(metrics: list[Metrics]) -> PublishCandidate:
     structure review, corrected): this is a CONVENTION this project's
     tests enforce, not a Python-enforced guarantee -- there is no CI here
     and a type hint alone stops nothing at runtime. The actual enforced
-    guarantee is what scrub() checks (see prepublish_scrub.py)."""
+    guarantee is what scrub() checks (see prepublish_scrub.py).
+
+    CORRECTED after a code-review pass (worf BLOCKER): rate metrics are
+    published ONLY for synthetic workloads, never real ones, and never
+    carry an operator-chosen workload_name in a real cell's label. This
+    was the original C1 design intent (rate metrics live on synthetic
+    data, where n is a free variable; real data contributes only pooled,
+    opaquely-labeled measurement metrics) -- the first implementation
+    violated it by calling _rate_cells unconditionally for both kinds,
+    which both leaked workload_name verbatim into a published label
+    (assert_numbers_only exempts 'label' from its numeric check) and
+    published a per-workload real rate at n>=10 instead of pooling it."""
     reported = [m for m in metrics if m.state == "reported"]
     cells: list[PublishCell] = []
 
     for m in reported:
+        if m.workload_kind != "synthetic":
+            continue  # real-workload rate metrics are never published, per-workload or pooled
         label_prefix = f"{m.backend_name} / {m.workload_name}"
-        threshold = MIN_RATE_N if m.workload_kind == "synthetic" else MIN_REAL_CELL_N
-        cells.extend(_rate_cells(m, label_prefix, threshold))
-        if m.workload_kind == "synthetic":
-            cells.extend(_measurement_cells(m, label_prefix, threshold=0))
+        cells.extend(_rate_cells(m, label_prefix, MIN_RATE_N))
+        cells.extend(_measurement_cells(m, label_prefix, threshold=0))
 
     cells.extend(_pooled_real_measurement_cells(reported))
 
@@ -73,7 +84,10 @@ def _pooled_real_measurement_cells(reported: list[Metrics]) -> list[PublishCell]
     all real workloads per backend before the MIN_REAL_CELL_N check --
     per-workload-type breakdowns re-identify at small n ('3/4' on 4 real
     PRs IS the four real PRs), a pooled cross-workload number does not
-    fingerprint which specific workload it came from."""
+    fingerprint which specific workload it came from. The label is a
+    fixed literal ('pooled real data'), never an operator-chosen
+    workload_name -- this is the ONLY path real data reaches a published
+    cell through, by construction (see build_publish_candidate above)."""
     real_by_backend: dict[str, list[Metrics]] = {}
     for m in reported:
         if m.workload_kind == "real":
@@ -98,11 +112,16 @@ def _pooled_real_measurement_cells(reported: list[Metrics]) -> list[PublishCell]
 def assert_numbers_only(candidate: PublishCandidate) -> None:
     """Runtime allowlist check, called by scrub() -- corrected per HIGH-2:
     the primary guard is now enforced at runtime, not just a dataclass
-    shape nobody promised to keep clean."""
+    shape nobody promised to keep clean. CORRECTED (worf MEDIUM): bool is
+    an int subclass in Python -- isinstance(True, int) is True -- so a
+    bool value would have silently passed this check before. Rejected
+    explicitly now."""
     for cell in candidate.cells:
         for f in dataclasses.fields(cell):
             value = getattr(cell, f.name)
             if f.name == "label":
                 continue
+            if isinstance(value, bool):
+                raise ValueError(f"PublishCell field '{f.name}' is a bool, not a meaningful numeric value")
             if value is not None and not isinstance(value, (int, float)):
                 raise ValueError(f"PublishCell field '{f.name}' is not numeric: {type(value)}")

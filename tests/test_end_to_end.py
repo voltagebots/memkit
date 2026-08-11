@@ -14,7 +14,7 @@ from harness.render_public_report import render_public_report
 from harness.replay import replay_workload
 from harness.score import score_run
 from harness.workload_loader import load_synthetic_workload
-from scripts.prepublish_scrub import scrub_bytes
+from scripts.prepublish_scrub import load_denylist, scrub_bytes
 
 
 def _small_slice(workload, n_events: int):
@@ -36,9 +36,13 @@ def test_full_synthetic_run_raw_history_backend():
     rendered = render_public_report(candidate)
     assert "not a benchmark" in rendered
 
-    with open("scripts/denylist.txt") as f:
-        denylist = [line.strip() for line in f if line.strip() and not line.startswith("#")]
-    result = scrub_bytes(rendered, denylist)
+    # Uses the REAL load_denylist(), not a reimplemented loader -- a prior
+    # version of this test hand-rolled its own comment-skipping logic here,
+    # which meant a real bug in load_denylist() itself (it wasn't skipping
+    # '#' lines, so a bare '#' matched every markdown heading and the
+    # shipped scrub was permanently fail-closed) went undetected by a
+    # test that looked like it was exercising the real gate.
+    result = scrub_bytes(rendered, load_denylist())
     assert result.passed, result.reasons
 
 
