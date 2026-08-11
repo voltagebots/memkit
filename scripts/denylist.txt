@@ -2,13 +2,17 @@
 # rendered RESULTS_PUBLIC.md. Fails closed if this file is missing or
 # empty -- do not delete all entries to "pass" a scrub.
 #
-# Seeded with known identifiers only. REQUIRED before running against
-# real voltage/sentinel data: add every real colleague name, org name,
-# and PR/repo identifier that appears anywhere in the real workload --
-# this file is the last line of defense if the numbers-only pipeline
-# upstream ever has a bug, not the primary control.
-Franklin Okpako
-franklin.okpako075
-okpakofr
-voltagebots
-agent-rails
+# NOT for self-references (the author's own name, their own org/repo
+# hosting this project) -- those are expected to appear in a report
+# about the author's own work and aren't the privacy risk.
+#
+# REQUIRED before running against real voltage/sentinel data: add every
+# real colleague name, third-party org name, and PR/repo identifier that
+# appears anywhere in the real workload. This file is the last line of
+# defense if the numbers-only pipeline upstream ever has a bug -- the
+# primary control is that PublishCandidate never carries free text at
+# all -- not the primary control itself.
+#
+# (placeholder -- currently empty on purpose until real workload data
+# exists to enumerate; the loader still requires at least one line, so:)
+PLACEHOLDER_FILL_IN_REAL_NAMES_BEFORE_RUNNING_AGAINST_REAL_DATA
