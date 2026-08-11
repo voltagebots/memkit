@@ -7,6 +7,7 @@ dependencies = [
     "httpx>=0.27",
     "numpy>=1.26",
     "tiktoken>=0.7",
+    "sentence-transformers>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -28,3 +29,6 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: downloads/loads a real model or hits a real network service on first run",
+]
