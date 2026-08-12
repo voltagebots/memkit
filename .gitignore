@@ -3,6 +3,7 @@ data/private/
 *.sqlite
 *.sqlite3
 RESULTS_PRIVATE.md
+RESULTS_PUBLIC.md
 __pycache__/
 *.pyc
 .venv/

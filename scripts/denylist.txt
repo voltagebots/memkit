@@ -6,13 +6,16 @@
 # hosting this project) -- those are expected to appear in a report
 # about the author's own work and aren't the privacy risk.
 #
-# REQUIRED before running against real voltage/sentinel data: add every
-# real colleague name, third-party org name, and PR/repo identifier that
-# appears anywhere in the real workload. This file is the last line of
-# defense if the numbers-only pipeline upstream ever has a bug -- the
-# primary control is that PublishCandidate never carries free text at
-# all -- not the primary control itself.
-#
-# (placeholder -- currently empty on purpose until real workload data
-# exists to enumerate; the loader still requires at least one line, so:)
-PLACEHOLDER_FILL_IN_REAL_NAMES_BEFORE_RUNNING_AGAINST_REAL_DATA
+# Below: fictional test names from data/private/test_real_*.json (the
+# dry-run workloads proving the real-data pipeline before real data is
+# ever used). REQUIRED before running against the actual voltage/
+# sentinel wiki data: replace/extend these with the real colleague
+# names, org names, and PR/repo identifiers that appear there. This
+# file is the last line of defense if the numbers-only pipeline
+# upstream ever has a bug -- not the primary control (PublishCandidate
+# never carries free text at all, by construction).
+Jordan Ashworth
+Priya Nakamura
+Riverstone Analytics
+webshop-checkout
+PR-4821
