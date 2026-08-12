@@ -29,7 +29,16 @@ _MEASUREMENT_FIELDS = _PER_CALL_MEASUREMENT_FIELDS + _END_STATE_MEASUREMENT_FIEL
 # label that doesn't match this shape is rejected, regardless of what
 # value/n/ci it carries -- this makes "no arbitrary operator text in a
 # label" enforced, not just true by the current call sites' behavior.
-_KNOWN_BACKENDS = frozenset({"RawHistoryBackend", "LocalVectorBackend", "Mem0Backend", "MemkitBackend"})
+_KNOWN_BACKENDS = frozenset(
+    {
+        "RawHistoryBackend",
+        "LocalVectorBackend",
+        "MemkitBackend",
+        "MemkitClaudeResolverBackend",
+        "Mem0Backend(local)",
+        "Mem0Backend(hybrid)",
+    }
+)
 _KNOWN_SYNTHETIC_WORKLOADS = frozenset({"contradiction_workload"})
 _KNOWN_FIELDS = frozenset(_RATE_FIELDS) | frozenset(_MEASUREMENT_FIELDS)
 
