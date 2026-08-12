@@ -21,6 +21,7 @@ def replay_workload(
     *,
     checkpoint_path: Path | None = None,
     resume_key: str | None = None,
+    backend_name: str | None = None,
 ) -> RunLog:
     """The only function that calls backends directly. A backend failure
     is recorded explicitly as a typed error entry, never silently
@@ -33,8 +34,16 @@ def replay_workload(
     Only safe for backends whose state survives a process restart on its
     own (external store keyed by user_id) -- callers must not pass this
     for a pure in-memory backend, since resuming would skip write events
-    whose effect was never actually persisted anywhere."""
-    run_log = RunLog(backend_name=type(backend).__name__, workload_name=workload.name, workload_kind=workload.kind)
+    whose effect was never actually persisted anywhere.
+
+    backend_name defaults to type(backend).__name__, but callers running
+    the same class under different configs (Mem0Backend's local/hybrid/
+    default modes -- one class, three deployments) must pass an explicit
+    override, or the resulting Metrics would silently blend configs under
+    one identity, contradicting the disclosed-separation principle applied
+    everywhere else in this harness."""
+    resolved_name = backend_name if backend_name is not None else type(backend).__name__
+    run_log = RunLog(backend_name=resolved_name, workload_name=workload.name, workload_kind=workload.kind)
     resumable = checkpoint_path is not None and resume_key is not None
     existing = load_event_checkpoint(checkpoint_path, resume_key) if resumable else {}
 

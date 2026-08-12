@@ -51,6 +51,24 @@ def test_replay_records_write_and_query_entries():
     assert not run_log.incomplete
 
 
+def test_replay_backend_name_defaults_to_class_name():
+    backend = FakeBackend({})
+    workload = Workload(name="w", kind="synthetic", events=())
+    run_log = replay_workload(backend, workload)
+    assert run_log.backend_name == "FakeBackend"
+
+
+def test_replay_backend_name_override_prevents_config_conflation():
+    """Regression: a single class run under different configs (e.g.
+    Mem0Backend's local/hybrid/default modes) must not silently share one
+    backend_name -- that would blend genuinely different deployments'
+    Metrics under one identity."""
+    backend = FakeBackend({})
+    workload = Workload(name="w", kind="synthetic", events=())
+    run_log = replay_workload(backend, workload, backend_name="FakeBackend(special-mode)")
+    assert run_log.backend_name == "FakeBackend(special-mode)"
+
+
 def test_replay_marks_incomplete_on_backend_error():
     workload = Workload(
         name="w", kind="synthetic", events=(WorkloadEvent(kind="write", at=1.0, fact_id="f1", fact_text="x"),)

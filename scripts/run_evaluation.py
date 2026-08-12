@@ -15,6 +15,7 @@ last completed event rather than losing the whole pair
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -46,7 +47,7 @@ MEMKIT_API_KEY = "dev-key"
 # Backends whose state survives a process restart on its own (external
 # store keyed by user_id) -- only these are safe to resume event-by-event.
 # A pure in-memory backend has nothing to resume from.
-_EXTERNALLY_PERSISTED_BACKENDS = {"MemkitBackend", "Mem0Backend(local)"}
+_EXTERNALLY_PERSISTED_BACKENDS = {"MemkitBackend", "Mem0Backend(local)", "Mem0Backend(hybrid)"}
 
 
 def _memkit_reachable() -> bool:
@@ -96,7 +97,10 @@ def _available_backends() -> dict[str, Callable[[str], object]]:
     else:
         print(f"[skip] MemkitBackend unavailable: no server at {MEMKIT_URL}", file=sys.stderr)
 
-    if _ollama_has("llama3.1") and _ollama_has("nomic-embed-text"):
+    skip_local = os.environ.get("MEMKIT_EVAL_SKIP_MEM0_LOCAL") == "1"
+    if skip_local:
+        print("[skip] Mem0Backend(local) skipped via MEMKIT_EVAL_SKIP_MEM0_LOCAL=1", file=sys.stderr)
+    elif _ollama_has("llama3.1") and _ollama_has("nomic-embed-text"):
         try:
             import mem0  # noqa: F401
 
@@ -107,6 +111,18 @@ def _available_backends() -> dict[str, Callable[[str], object]]:
             print(f"[skip] Mem0Backend(local) unavailable: {err}", file=sys.stderr)
     else:
         print("[skip] Mem0Backend(local) unavailable: missing llama3.1/nomic-embed-text ollama models", file=sys.stderr)
+
+    if os.environ.get("ANTHROPIC_API_KEY") and _ollama_has("nomic-embed-text"):
+        try:
+            import mem0  # noqa: F401
+
+            from backends.mem0_backend import Mem0Backend
+
+            backends["Mem0Backend(hybrid)"] = lambda user_id: Mem0Backend(mode="hybrid", user_id=user_id)
+        except ImportError as err:
+            print(f"[skip] Mem0Backend(hybrid) unavailable: {err}", file=sys.stderr)
+    else:
+        print("[skip] Mem0Backend(hybrid) unavailable: needs ANTHROPIC_API_KEY + nomic-embed-text", file=sys.stderr)
 
     return backends
 
@@ -125,6 +141,7 @@ def _run_pair(backend_name, backend, workload, done_metrics):
         workload,
         checkpoint_path=EVENT_CHECKPOINT_PATH if resumable else None,
         resume_key=key if resumable else None,
+        backend_name=backend_name,
     )
     metrics = score_run(run_log, workload)
     append_checkpoint(CHECKPOINT_PATH, key, metrics)
