@@ -76,3 +76,13 @@ class MemkitBackend:
 
     def close(self) -> None:
         self._client.close()
+
+
+class MemkitClaudeResolverBackend(MemkitBackend):
+    """Identical client, pointed at a memkit instance running with the
+    Claude LLM conflict resolver enabled (ANTHROPIC_API_KEY set) instead
+    of the heuristic-only default. Kept as a separate class -- and
+    therefore a separate backend_name via type(backend).__name__ in
+    replay.py -- so results are never silently blended with the
+    heuristic-only MemkitBackend run, same disclosed-separation principle
+    already applied to Mem0Backend's default-vs-local modes."""
