@@ -58,7 +58,7 @@ class MemkitBackend:
         # dropping memkit from the comparison instead of surfacing the
         # shape mismatch.
         data = resp.json()
-        results = data.get("results", []) if isinstance(data, dict) else data
+        results = data.get("memories", []) if isinstance(data, dict) else data
         return [
             RetrievedFact(
                 fact_id=self._server_id_to_fact_id.get(r.get("id"), r.get("id")),

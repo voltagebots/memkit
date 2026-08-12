@@ -18,7 +18,7 @@ def _mock_memkit_transport() -> httpx.MockTransport:
             return httpx.Response(200, json={"id": SERVER_ID, "action": "add"})
         if request.method == "GET" and request.url.path == "/v1/memories/search":
             return httpx.Response(
-                200, json={"results": [{"id": SERVER_ID, "content": "User works at Acme", "score": 0.95}]}
+                200, json={"count": 1, "memories": [{"id": SERVER_ID, "content": "User works at Acme", "score": 0.95}]}
             )
         raise AssertionError(f"unexpected request: {request.method} {request.url.path}")
 
