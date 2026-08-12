@@ -135,6 +135,15 @@ def _available_backends() -> dict[str, Callable[[str], object]]:
     return backends
 
 
+def _close_backend(backend) -> None:
+    """Not every backend needs closing (RawHistoryBackend/LocalVectorBackend
+    are pure in-memory), so this is a no-op for those rather than a
+    Protocol requirement every backend must implement."""
+    close = getattr(backend, "close", None)
+    if callable(close):
+        close()
+
+
 def _run_pair(backend_name, backend, workload, done_metrics):
     """Runs one (backend, workload) pair, or reuses it from the pair-level
     checkpoint if already finished. Returns (metrics, run_log_or_None)."""
@@ -179,10 +188,14 @@ def main() -> int:
             if run_log is not None:
                 run_logs.append(run_log)
             print(f"  {backend_name} / {name}: incomplete={run_log.incomplete if run_log else 'N/A'} n={m.n}")
+        _close_backend(synthetic_backend)
 
         # fresh backend instance + unique user_id per real workload: the actual
         # isolation boundary for MemkitBackend/Mem0Backend, which persist to an
         # external store keyed by user_id rather than in Python-object memory.
+        # Closed immediately after each pair -- some (e.g. mem0 local/hybrid's
+        # on-disk Qdrant) hold an exclusive file lock for the instance's whole
+        # lifetime; an unclosed prior instance crashes the next one.
         for name in REAL_WORKLOAD_NAMES:
             workload = load_real_workload(name)
             key = checkpoint_key(backend_name, name)
@@ -192,6 +205,7 @@ def main() -> int:
             if run_log is not None:
                 run_logs.append(run_log)
             print(f"  {backend_name} / {name} (real): incomplete={run_log.incomplete if run_log else 'N/A'} n={m.n}")
+            _close_backend(fresh_backend)
 
     write_private_report(run_logs, metrics)
     print("\nprivate report written to data/private/RESULTS_PRIVATE.md (never committed)")

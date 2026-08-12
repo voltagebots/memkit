@@ -87,3 +87,26 @@ class Mem0Backend:
         # mem0's OSS library has no size-report API either -- same honest
         # gap as MemkitBackend, not faked.
         raise NotImplementedError("mem0 has no storage-size API; measure the vector store's on-disk size directly")
+
+    def close(self) -> None:
+        # CORRECTED (live crash, real run): Memory.close() only releases its
+        # SQLite history connection, not either Qdrant client it holds for
+        # local/hybrid mode's on-disk store -- each holds an exclusive file
+        # lock for its whole lifetime. Creating a fresh Mem0Backend per
+        # workload (the per-workload isolation pattern run_evaluation.py
+        # uses for every externally-persisted backend) without releasing
+        # the previous instance's locks crashed the next one. mem0 keeps
+        # TWO separate local Qdrant clients, discovered one crash at a
+        # time: `vector_store` (the configured collection) and a second,
+        # internal `_telemetry_vector_store` (its own "mem0migrations"
+        # bookkeeping collection, created unconditionally for qdrant/faiss
+        # regardless of MEM0_TELEMETRY). No public API closes either --
+        # reaching into vector_store.client directly, same attribute mem0's
+        # own code checks internally before touching it.
+        self._memory.close()
+        if self._mode not in ("local", "hybrid"):
+            return
+        for store_attr in ("vector_store", "_telemetry_vector_store"):
+            store = getattr(self._memory, store_attr, None)
+            if store is not None and hasattr(store, "client"):
+                store.client.close()
