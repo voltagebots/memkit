@@ -16,6 +16,14 @@ last completed event rather than losing the whole pair
 from __future__ import annotations
 
 import os
+
+# Must be set before ANY `import mem0` in the process -- mem0.memory.telemetry
+# reads this at module import time. backends/mem0_backend.py also sets it,
+# but too late here: _available_backends()'s own `import mem0` (an early
+# availability probe, see below) runs first and already imports the
+# telemetry module with the default (on) before that module-level line fires.
+os.environ.setdefault("MEM0_TELEMETRY", "False")
+
 import sys
 from collections.abc import Callable
 from pathlib import Path
