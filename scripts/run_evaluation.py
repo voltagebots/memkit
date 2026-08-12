@@ -146,9 +146,16 @@ def _close_backend(backend) -> None:
 
 def _run_pair(backend_name, backend, workload, done_metrics):
     """Runs one (backend, workload) pair, or reuses it from the pair-level
-    checkpoint if already finished. Returns (metrics, run_log_or_None)."""
+    checkpoint if already finished. Returns (metrics, run_log_or_None).
+
+    CORRECTED (live run): a checkpointed pair with state="incomplete" is a
+    *failed* attempt, not a finished one -- e.g. every hybrid-mode write
+    failing on an Anthropic billing error. Treating it as done would cache
+    the failure forever, silently skipping retry even after the underlying
+    problem (low API credit, a transient outage) is fixed. Only a
+    state="reported" (successful) result is safe to skip."""
     key = checkpoint_key(backend_name, workload.name)
-    if key in done_metrics:
+    if key in done_metrics and done_metrics[key].state == "reported":
         print(f"  {backend_name} / {workload.name}: [resumed from checkpoint] n={done_metrics[key].n}")
         return done_metrics[key], None
 
