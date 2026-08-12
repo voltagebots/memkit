@@ -81,3 +81,22 @@ func TestSupersededExcludedFromSearch(t *testing.T) {
 		t.Fatalf("want only active v2, got %+v", got)
 	}
 }
+
+func TestSearchHandlesHyphenatedQuery(t *testing.T) {
+	// Regression: a bareword FTS5 token containing '-' is a syntax error
+	// unless quoted. escapeFTS handled '"', '*', '\'' but not '-', so any
+	// query with a hyphenated word ("on-call", "PR-4821") returned a SQL
+	// error instead of results -- live-reproduced against a running server
+	// before this fix (2026-08-12).
+	s := mustOpen(t)
+	ctx := context.Background()
+	insert(t, s, "oncall", "the on-call engineer is Priya", time.Now())
+
+	got, err := s.Search(ctx, "t", "u", "who is on-call", SearchOpts{})
+	if err != nil {
+		t.Fatalf("search with hyphenated query must not error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "oncall" {
+		t.Fatalf("want the on-call fact to match, got %+v", got)
+	}
+}

@@ -361,7 +361,12 @@ func sortByScoreDesc(s []Scored) {
 func escapeFTS(q string) string {
 	clean := strings.Map(func(r rune) rune {
 		switch r {
-		case '"', '*', '\'':
+		// CORRECTED (live smoke test, 2026-08-12): a bareword FTS5 token
+		// containing '-' is a syntax error unless quoted -- any query with
+		// a hyphenated word ("on-call", "PR-4821") returned 500 instead of
+		// results. Handled the same way as the existing quote/asterisk
+		// characters: split into separate words rather than one token.
+		case '"', '*', '\'', '-':
 			return ' '
 		}
 		return r
