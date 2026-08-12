@@ -12,7 +12,14 @@ from harness.tokens import count_tokens
 # so DEFAULT and LOCAL are genuinely different deployments, run and
 # reported separately, not silently blended into one number.
 _LOCAL_CONFIG = {
-    "vector_store": {"provider": "qdrant", "config": {"path": "/tmp/memkit-eval-qdrant"}},
+    "vector_store": {
+        "provider": "qdrant",
+        # CORRECTED (live smoke test): mem0's qdrant store defaults to
+        # 1536 dims (OpenAI's embedding size). nomic-embed-text produces
+        # 768-dim vectors -- left at the default, every write raised a
+        # shape-mismatch error instead of writing.
+        "config": {"path": "/tmp/memkit-eval-qdrant", "embedding_model_dims": 768},
+    },
     "llm": {"provider": "ollama", "config": {"model": "llama3.1:8b"}},
     "embedder": {"provider": "ollama", "config": {"model": "nomic-embed-text"}},
 }
