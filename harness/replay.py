@@ -1,46 +1,76 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 from backends import MemoryBackend
-from harness.models import QueryLogEntry, RunLog, Workload, WriteLogEntry, WriteResult
+from harness.event_checkpoint import append_event_checkpoint, load_event_checkpoint
+from harness.models import LogEntry, QueryLogEntry, RunLog, Workload, WriteLogEntry, WriteResult
 from harness.tokens import count_tokens
 
 
-def replay_workload(backend: MemoryBackend, workload: Workload) -> RunLog:
+def _entry_is_failed(entry: LogEntry) -> bool:
+    if isinstance(entry, WriteLogEntry):
+        return not entry.result.ok
+    return entry.error is not None
+
+
+def replay_workload(
+    backend: MemoryBackend,
+    workload: Workload,
+    *,
+    checkpoint_path: Path | None = None,
+    resume_key: str | None = None,
+) -> RunLog:
     """The only function that calls backends directly. A backend failure
     is recorded explicitly as a typed error entry, never silently
     skipped -- a silently-incomplete RunLog would produce a Metrics
-    object that looks complete but isn't."""
-    run_log = RunLog(backend_name=type(backend).__name__, workload_name=workload.name, workload_kind=workload.kind)
+    object that looks complete but isn't.
 
-    for event in workload.events:
-        if event.kind == "write":
-            _replay_write(backend, event, run_log)
+    checkpoint_path/resume_key enable event-level resume: each completed
+    event is persisted immediately, so a kill mid-workload loses at most
+    one in-flight event rather than the whole (backend, workload) pair.
+    Only safe for backends whose state survives a process restart on its
+    own (external store keyed by user_id) -- callers must not pass this
+    for a pure in-memory backend, since resuming would skip write events
+    whose effect was never actually persisted anywhere."""
+    run_log = RunLog(backend_name=type(backend).__name__, workload_name=workload.name, workload_kind=workload.kind)
+    resumable = checkpoint_path is not None and resume_key is not None
+    existing = load_event_checkpoint(checkpoint_path, resume_key) if resumable else {}
+
+    for i, event in enumerate(workload.events):
+        already_done = i in existing
+        if already_done:
+            entry = existing[i]
+        elif event.kind == "write":
+            entry = _replay_write(backend, event)
         else:
-            _replay_query(backend, event, run_log)
+            entry = _replay_query(backend, event)
+
+        if not already_done and resumable:
+            append_event_checkpoint(checkpoint_path, resume_key, i, entry)
+
+        run_log.entries.append(entry)
+        if _entry_is_failed(entry):
+            run_log.incomplete = True
 
     return run_log
 
 
-def _replay_write(backend: MemoryBackend, event, run_log: RunLog) -> None:
+def _replay_write(backend: MemoryBackend, event) -> WriteLogEntry:
     try:
         result = backend.write(event.fact_id, event.fact_text, at=event.at)
     except Exception as err:
-        run_log.incomplete = True
         failed = WriteResult(ok=False, latency_ms=0.0, token_count=count_tokens(event.fact_text or ""), error=str(err))
-        run_log.entries.append(WriteLogEntry(event_at=event.at, result=failed))
-        return
-    run_log.entries.append(WriteLogEntry(event_at=event.at, result=result))
+        return WriteLogEntry(event_at=event.at, result=failed)
+    return WriteLogEntry(event_at=event.at, result=result)
 
 
-def _replay_query(backend: MemoryBackend, event, run_log: RunLog) -> None:
+def _replay_query(backend: MemoryBackend, event) -> QueryLogEntry:
     start = time.perf_counter()
     try:
         retrieved = backend.query(event.query_text, at=event.at)
     except Exception as err:
-        run_log.incomplete = True
-        run_log.entries.append(QueryLogEntry(event_at=event.at, retrieved=(), latency_ms=0.0, error=str(err)))
-        return
+        return QueryLogEntry(event_at=event.at, retrieved=(), latency_ms=0.0, error=str(err))
     latency_ms = (time.perf_counter() - start) * 1000
-    run_log.entries.append(QueryLogEntry(event_at=event.at, retrieved=tuple(retrieved), latency_ms=latency_ms))
+    return QueryLogEntry(event_at=event.at, retrieved=tuple(retrieved), latency_ms=latency_ms)

@@ -2,7 +2,16 @@
 writes the private report (data/private/, never committed), builds and
 renders the public report, scrubs it, and reports pass/fail. Does not
 copy anything to techbots-dev -- that stays a manual, human-reviewed
-step, on purpose."""
+step, on purpose.
+
+Resumable: a killed run (mem0-local's real-LLM-per-write cost makes this a
+real risk, not hypothetical -- it happened twice) picks back up rather than
+restarting from zero. Two layers: a finished (backend, workload) pair is
+skipped entirely on the next run (harness/checkpoint.py); an in-flight pair
+for an externally-persisted backend (MemkitBackend, Mem0Backend -- state
+survives a process restart on its own, keyed by user_id) resumes from its
+last completed event rather than losing the whole pair
+(harness/event_checkpoint.py, wired through replay_workload)."""
 
 from __future__ import annotations
 
@@ -13,6 +22,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backends.raw_history import RawHistoryBackend
+from harness.checkpoint import CHECKPOINT_PATH, append_checkpoint, checkpoint_key, load_checkpoint
+from harness.event_checkpoint import EVENT_CHECKPOINT_PATH
 from harness.publish_candidate import build_publish_candidate
 from harness.render_public_report import render_public_report
 from harness.replay import replay_workload
@@ -31,6 +42,11 @@ SYNTHETIC_WORKLOAD_NAMES = ["contradiction_workload"]
 
 MEMKIT_URL = "http://localhost:8080"
 MEMKIT_API_KEY = "dev-key"
+
+# Backends whose state survives a process restart on its own (external
+# store keyed by user_id) -- only these are safe to resume event-by-event.
+# A pure in-memory backend has nothing to resume from.
+_EXTERNALLY_PERSISTED_BACKENDS = {"MemkitBackend", "Mem0Backend(local)"}
 
 
 def _memkit_reachable() -> bool:
@@ -95,32 +111,62 @@ def _available_backends() -> dict[str, Callable[[str], object]]:
     return backends
 
 
+def _run_pair(backend_name, backend, workload, done_metrics):
+    """Runs one (backend, workload) pair, or reuses it from the pair-level
+    checkpoint if already finished. Returns (metrics, run_log_or_None)."""
+    key = checkpoint_key(backend_name, workload.name)
+    if key in done_metrics:
+        print(f"  {backend_name} / {workload.name}: [resumed from checkpoint] n={done_metrics[key].n}")
+        return done_metrics[key], None
+
+    resumable = backend_name in _EXTERNALLY_PERSISTED_BACKENDS
+    run_log = replay_workload(
+        backend,
+        workload,
+        checkpoint_path=EVENT_CHECKPOINT_PATH if resumable else None,
+        resume_key=key if resumable else None,
+    )
+    metrics = score_run(run_log, workload)
+    append_checkpoint(CHECKPOINT_PATH, key, metrics)
+    return metrics, run_log
+
+
 def main() -> int:
     backend_factories = _available_backends()
     print(f"backends available: {list(backend_factories)}")
+
+    done_metrics = load_checkpoint(CHECKPOINT_PATH)
+    if done_metrics:
+        print(f"resuming: {len(done_metrics)} (backend, workload) pairs already checkpointed")
 
     run_logs = []
     metrics = []
 
     for backend_name, make_backend in backend_factories.items():
-        synthetic_backend = make_backend(f"memkit-eval-{backend_name}-synthetic")
+        synthetic_backend = None
         for name in SYNTHETIC_WORKLOAD_NAMES:
             workload = load_synthetic_workload(name)
-            run_log = replay_workload(synthetic_backend, workload)
-            run_logs.append(run_log)
-            metrics.append(score_run(run_log, workload))
-            print(f"  {backend_name} / {name}: {run_logs[-1].incomplete=} n={metrics[-1].n}")
+            key = checkpoint_key(backend_name, name)
+            if key not in done_metrics and synthetic_backend is None:
+                synthetic_backend = make_backend(f"memkit-eval-{backend_name}-synthetic")
+            m, run_log = _run_pair(backend_name, synthetic_backend, workload, done_metrics)
+            metrics.append(m)
+            if run_log is not None:
+                run_logs.append(run_log)
+            print(f"  {backend_name} / {name}: incomplete={run_log.incomplete if run_log else 'N/A'} n={m.n}")
 
         # fresh backend instance + unique user_id per real workload: the actual
         # isolation boundary for MemkitBackend/Mem0Backend, which persist to an
         # external store keyed by user_id rather than in Python-object memory.
         for name in REAL_WORKLOAD_NAMES:
-            fresh_backend = make_backend(f"memkit-eval-{backend_name}-{name}")
             workload = load_real_workload(name)
-            run_log = replay_workload(fresh_backend, workload)
-            run_logs.append(run_log)
-            metrics.append(score_run(run_log, workload))
-            print(f"  {backend_name} / {name} (real): incomplete={run_log.incomplete} n={metrics[-1].n}")
+            key = checkpoint_key(backend_name, name)
+            fresh_backend = None if key in done_metrics else make_backend(f"memkit-eval-{backend_name}-{name}")
+            m, run_log = _run_pair(backend_name, fresh_backend, workload, done_metrics)
+            metrics.append(m)
+            if run_log is not None:
+                run_logs.append(run_log)
+            print(f"  {backend_name} / {name} (real): incomplete={run_log.incomplete if run_log else 'N/A'} n={m.n}")
 
     write_private_report(run_logs, metrics)
     print("\nprivate report written to data/private/RESULTS_PRIVATE.md (never committed)")
