@@ -1,0 +1,21 @@
+# One pattern per line, case-insensitive substring match against the
+# rendered RESULTS_PUBLIC.md. Fails closed if this file is missing or
+# empty -- do not delete all entries to "pass" a scrub.
+#
+# NOT for self-references (the author's own name, their own org/repo
+# hosting this project) -- those are expected to appear in a report
+# about the author's own work and aren't the privacy risk.
+#
+# Below: fictional test names from data/private/test_real_*.json (the
+# dry-run workloads proving the real-data pipeline before real data is
+# ever used). REQUIRED before running against the actual voltage/
+# sentinel wiki data: replace/extend these with the real colleague
+# names, org names, and PR/repo identifiers that appear there. This
+# file is the last line of defense if the numbers-only pipeline
+# upstream ever has a bug -- not the primary control (PublishCandidate
+# never carries free text at all, by construction).
+Jordan Ashworth
+Priya Nakamura
+Riverstone Analytics
+webshop-checkout
+PR-4821

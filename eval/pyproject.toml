@@ -1,0 +1,34 @@
+[project]
+name = "memkit-eval"
+version = "0.1.0"
+description = "Private evaluation harness: MemKit vs baselines, real measured comparison"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "numpy>=1.26",
+    "tiktoken>=0.7",
+    "sentence-transformers>=3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "mem0ai>=0.1", "ollama>=0.4", "qdrant-client>=1.9", "anthropic>=0.40"]
+mem0 = ["mem0ai>=0.1", "ollama>=0.4", "qdrant-client>=1.9", "anthropic>=0.40"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["backends", "harness"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: downloads/loads a real model or hits a real network service on first run",
+]
